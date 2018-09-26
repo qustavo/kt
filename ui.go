@@ -73,13 +73,12 @@ func main() {
 		log.Fatal(err)
 	}
 
-	table := tview.NewTable()
-
-	var pods = [][]string{
-		[]string{"NAME", "READY", "STATUS", "RESTARTS", "AGE"},
-		[]string{"proxy-2423423-23423", "1/1", "Running", "7", "9h"},
-		[]string{"a-very-long-name-for-a-fake-service", "1/3", "[:red]Error[white:]", "99", "1d"},
+	pods, err := client.PODs()
+	if err != nil {
+		log.Fatal(err)
 	}
+
+	table := tview.NewTable()
 
 	app := tview.NewApplication()
 	app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
@@ -87,7 +86,7 @@ func main() {
 		case tcell.KeyF1:
 			RenderTable(table, deployments)
 		case tcell.KeyF2:
-			RenderTable(table, TableAdapter(pods))
+			RenderTable(table, pods)
 		}
 
 		switch event.Rune() {
