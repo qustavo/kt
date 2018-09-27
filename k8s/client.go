@@ -21,9 +21,10 @@ type Interface interface {
 
 type Client struct {
 	*kubernetes.Clientset
+	ns string
 }
 
-func New() (*Client, error) {
+func New(ns string) (*Client, error) {
 	config, err := clientcmd.BuildConfigFromFlags("", filepath.Join(os.Getenv("HOME"), ".kube", "config"))
 	if err != nil {
 		return nil, err
@@ -34,7 +35,7 @@ func New() (*Client, error) {
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Client{cs}, nil
+	return &Client{Clientset: cs, ns: ns}, nil
 }
 
 type Table struct {
@@ -80,7 +81,7 @@ func (c *Client) Deployments() (*Table, error) {
 	)
 
 	opts := meta.ListOptions{}
-	watcher, err := c.Apps().Deployments("default").Watch(opts)
+	watcher, err := c.Apps().Deployments(c.ns).Watch(opts)
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +120,7 @@ func (c *Client) PODs() (*Table, error) {
 	)
 
 	opts := meta.ListOptions{}
-	watcher, err := c.Core().Pods("default").Watch(opts)
+	watcher, err := c.Core().Pods(c.ns).Watch(opts)
 	if err != nil {
 		return nil, err
 	}

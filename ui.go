@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"strings"
 
 	"github.com/gchaincl/kt/k8s"
@@ -149,17 +148,5 @@ func (ui *UI) watch() {
 		}
 
 		ui.app.Draw()
-	}
-}
-
-func main() {
-	client, err := k8s.New()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	ui := New(client)
-	if err := ui.Run(); err != nil {
-		log.Fatalln(err)
 	}
 }
