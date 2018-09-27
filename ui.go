@@ -12,9 +12,10 @@ import (
 
 type Table interface {
 	Rows() [][]string
+	Updates() chan struct{}
 }
 
-func RenderTable(table *tview.Table, i Table) *tview.Table {
+func renderTable(table *tview.Table, i Table) {
 	table.Clear()
 
 	for i, row := range i.Rows() {
@@ -31,7 +32,6 @@ func RenderTable(table *tview.Table, i Table) *tview.Table {
 
 	table.
 		SetSelectable(true, false).
-		Select(1, 1).
 		SetFixed(1, 0).
 		SetSelectionChangedFunc(func(row int, column int) {
 			if row == 0 {
@@ -40,12 +40,11 @@ func RenderTable(table *tview.Table, i Table) *tview.Table {
 			}
 		})
 
-	return table
+	x, y := table.GetSelection()
+	if x == 0 && y == 0 {
+		table.Select(1, 1)
+	}
 }
-
-type TableAdapter [][]string
-
-func (t TableAdapter) Rows() [][]string { return t }
 
 func menuBar() *tview.TextView {
 	actions := []string{
@@ -62,41 +61,24 @@ func menuBar() *tview.TextView {
 	return tview.NewTextView().SetDynamicColors(true).SetText(strings.Join(actions, " "))
 }
 
-func main() {
-	client, err := k8s.New()
-	if err != nil {
-		log.Fatal(err)
-	}
+const (
+	DeploymentsTable = iota
+	PODsTable
+)
 
-	deployments, err := client.Deployments()
-	if err != nil {
-		log.Fatal(err)
-	}
+type UI struct {
+	app    *tview.Application
+	table  *tview.Table
+	client k8s.Interface
 
-	pods, err := client.PODs()
-	if err != nil {
-		log.Fatal(err)
-	}
+	// State
+	activeTable int
+	deployments Table
+	pods        Table
+}
 
+func New(c k8s.Interface) *UI {
 	table := tview.NewTable()
-
-	app := tview.NewApplication()
-	app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		switch event.Key() {
-		case tcell.KeyF1:
-			RenderTable(table, deployments)
-		case tcell.KeyF2:
-			RenderTable(table, pods)
-		}
-
-		switch event.Rune() {
-		case 'q':
-			app.Stop()
-		}
-
-		return event
-	})
-
 	grid := tview.NewGrid().
 		SetRows(0, 1).
 		SetColumns(0).
@@ -104,8 +86,80 @@ func main() {
 		AddItem(table, 0, 0, 1, 1, 0, 0, true).
 		AddItem(menuBar(), 1, 0, 1, 1, 0, 0, false)
 
-	RenderTable(table, deployments)
-	if err := app.SetRoot(grid, true).Run(); err != nil {
-		panic(err)
+	ui := &UI{
+		app:    tview.NewApplication(),
+		table:  table,
+		client: c,
+	}
+
+	ui.app.
+		SetRoot(grid, true).
+		SetInputCapture(func(ev *tcell.EventKey) *tcell.EventKey {
+			switch ev.Key() {
+			case tcell.KeyF1:
+				renderTable(ui.table, ui.deployments)
+				ui.activeTable = DeploymentsTable
+			case tcell.KeyF2:
+				renderTable(ui.table, ui.pods)
+				ui.activeTable = PODsTable
+			}
+
+			switch ev.Rune() {
+			case 'q':
+				ui.app.Stop()
+			}
+
+			return ev
+		})
+
+	return ui
+}
+
+func (ui *UI) Run() error {
+	var err error
+
+	ui.deployments, err = ui.client.Deployments()
+	if err != nil {
+		return err
+	}
+	renderTable(ui.table, ui.deployments)
+
+	ui.pods, err = ui.client.PODs()
+	if err != nil {
+		return err
+	}
+
+	go ui.watch()
+	return ui.app.Run()
+}
+
+func (ui *UI) watch() {
+	for {
+		// wait events on any source to trigger the app redraw.
+		select {
+		case <-ui.deployments.Updates():
+		case <-ui.pods.Updates():
+		}
+
+		switch ui.activeTable {
+		case DeploymentsTable:
+			renderTable(ui.table, ui.deployments)
+		case PODsTable:
+			renderTable(ui.table, ui.pods)
+		}
+
+		ui.app.Draw()
+	}
+}
+
+func main() {
+	client, err := k8s.New()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	ui := New(client)
+	if err := ui.Run(); err != nil {
+		log.Fatalln(err)
 	}
 }
