@@ -78,19 +78,20 @@ type UI struct {
 }
 
 func New(c k8s.Interface) *UI {
-	table := tview.NewTable()
+	return &UI{
+		app:    tview.NewApplication(),
+		table:  tview.NewTable(),
+		client: c,
+	}
+}
+
+func (ui *UI) setupApp() {
 	grid := tview.NewGrid().
 		SetRows(0, 1).
 		SetColumns(0).
 		SetBorders(false).
-		AddItem(table, 0, 0, 1, 1, 0, 0, true).
+		AddItem(ui.table, 0, 0, 1, 1, 0, 0, true).
 		AddItem(menuBar(), 1, 0, 1, 1, 0, 0, false)
-
-	ui := &UI{
-		app:    tview.NewApplication(),
-		table:  table,
-		client: c,
-	}
 
 	ui.app.
 		SetRoot(grid, true).
@@ -111,12 +112,11 @@ func New(c k8s.Interface) *UI {
 
 			return ev
 		})
-
-	return ui
 }
 
 func (ui *UI) Run() error {
 	var err error
+	ui.setupApp()
 
 	ui.deployments, err = ui.client.Deployments()
 	if err != nil {
