@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"log"
 	"os"
 
@@ -8,14 +9,14 @@ import (
 )
 
 func main() {
-	var ns string
-	if len(os.Args) > 1 {
-		ns = os.Args[1]
-	} else {
-		ns = "default"
+	// We use NewFlagSet because plog polutes the global flags.
+	fs := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+	ns := fs.String("n", "default", "Kubernetes Namespace")
+	if err := fs.Parse(os.Args[1:]); err != nil {
+		log.Fatal(err)
 	}
 
-	client, err := k8s.New(ns)
+	client, err := k8s.New(*ns)
 	if err != nil {
 		log.Fatal(err)
 	}
