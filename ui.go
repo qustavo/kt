@@ -20,29 +20,18 @@ func renderTable(table *tview.Table, i Table) {
 	for i, row := range i.Rows() {
 		for j, column := range row {
 			cell := tview.NewTableCell(column)
+			// Set header properties
 			if i == 0 {
-				cell.SetBackgroundColor(tcell.ColorGreen)
-				cell.SetTextColor(tcell.ColorBlack)
+				cell.SetSelectable(false).
+					SetBackgroundColor(tcell.ColorGreen).
+					SetTextColor(tcell.ColorBlack)
 			}
 
 			table.SetCell(i, j, cell)
 		}
 	}
 
-	table.
-		SetSelectable(true, false).
-		SetFixed(1, 0).
-		SetSelectionChangedFunc(func(row int, column int) {
-			if row == 0 {
-				table.Select(row+1, column)
-				return
-			}
-		})
-
-	x, y := table.GetSelection()
-	if x == 0 && y == 0 {
-		table.Select(1, 1)
-	}
+	table.SetSelectable(true, false).SetFixed(1, 0)
 }
 
 func menuBar() *tview.TextView {
